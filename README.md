@@ -15,8 +15,13 @@ Hypothesis testing.
 # Usage
 
 data = prepare_data("Book1.xlsx")
+
 data.head()
+
 best_model(data)
+
 calculate_CLV(data)
+
 visualize_CLV(data, 'gender')
+
 hyp_test(data, "gender")
