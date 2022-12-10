@@ -1,0 +1,183 @@
+from pandas import read_excel
+from lifelines import LogNormalAFTFitter, LogLogisticAFTFitter, CoxPHFitter
+from matplotlib.pyplot import figure, show, close
+import warnings
+warnings.filterwarnings("ignore")
+
+def prepare_data(excel_data):
+
+    """The main idea of this function is to prepare the data for the work. The most important point of the CLV analysis 
+       is the categorical data. For the data that is going to be used in this project has some non-categorical columns. 
+       So, this function is going to take the data, make it a categorical one and give it back to continue the work."""
+
+    data = read_excel(excel_data, index_col=0)
+    data["region"].replace({"Zone 3": 2, "Zone 2": 1, "Zone 1": 0}, inplace=True)
+    data["marital"].replace({"Married": 1, "Unmarried": 0}, inplace=True)
+    data["ed"].replace({"Post-undergraduate degree": 4, "College degree": 3, "Some college": 2, "High school degree": 1, "Did not complete high school": 0}, inplace=True)    
+    data["retire"].replace({"Yes": 1, "No": 0}, inplace=True)
+    data["gender"].replace({"Male": 0, "Female": 1}, inplace=True)
+    data["voice"].replace({"Yes": 1, "No": 0}, inplace=True)
+    data["internet"].replace({"Yes": 1, "No": 0}, inplace=True)
+    data["forward"].replace({"Yes": 1, "No": 0}, inplace=True)
+    data["custcat"].replace({"Total service": 3, "Plus service": 2, "E-service": 1, "Basic service": 0}, inplace=True)
+    data["churn"].replace({"Yes": 1, "No": 0}, inplace=True)
+    data["region"].replace({"Zone 3": 2, "Zone 2": 1, "Zone 1": 0}, inplace=True)
+    return data
+
+def best_model(data, duration="tenure", event="churn"):
+
+    """This function takes, following arguments: 
+    
+    1. df: DataFrame
+    2. duration: Name of column to be set as duration as string (optional)
+    3. event: Name of column to be set as event as string (optional)
+    
+    Then it compares the AIC values of 4 models/fitters:
+
+    1. WeibullAFTFitter()
+    2. LogNormalAFTFitter()
+    3. LogLogisticAFTFitter()
+    4. CoxPHFitter()
+    
+    And returns the model with the least AIC score."""
+
+    models = [LogNormalAFTFitter(), LogLogisticAFTFitter(), CoxPHFitter()]
+    min_AIC = float('inf')
+    for model in models:
+        model.fit(data, duration_col=duration, event_col=event)
+        try:
+            aic = model.AIC_
+        except:
+            aic = model.AIC_partial_
+
+        if  aic < min_AIC:
+            min_AIC = aic
+            min_model = model
+    return min_model
+
+def calculate_CLV(data, duration="tenure", event="churn"):
+
+    """This function takes, following arguments: 
+    
+    1. df: DataFrame
+    2. duration: Name of column to be set as duration as string (optional)
+    3. event: Name of column to be set as event as string (optional)
+
+    Then returns the predicted survival function."""
+
+    model = best_model(data, duration, event)
+    model.fit(data, duration_col=duration, event_col=event)
+    prediction = model.predict_survival_function(data)
+    prediction = prediction.iloc[0:24,0:5]
+    
+    MM = 1300
+    r = 0.1
+
+    for i in range(1, 6):
+        for index, row in prediction.iterrows():
+            row[i] = row[i] / pow((1 + r/12),i-1)
+
+    prediction['CLV'] = MM * prediction.sum(axis = 1)
+    return prediction['CLV'].describe()
+    
+def visualize_CLV(data, compare, duration="tenure", event="churn"):
+
+    """This function takes, following arguments: 
+    
+    1. df: DataFrame
+    2. comare: Name of the column to view the partial effects on outcome
+    3. duration: Name of column to be set as duration as string (optional)
+    4. event: Name of column to be set as event as string (optional)
+
+    Then plot tow graphs:
+    
+    1. Plot the cooeffitients and ranges
+    2. Plot the effects on outcome graph"""
+
+
+    if compare == "age":
+        value = range(20, 80, 5)
+    elif compare == "address":
+        value = range(0, 55, 5)
+    elif compare == "income":
+        value = range(0, 1670, 50)
+    else:
+        value = range(min(data[compare]), max(data[compare])+1)
+
+    model = best_model(data, duration, event)
+    model.fit(data, duration_col=duration, event_col=event)
+    figure(figsize=(10,5))
+    model.plot()
+    show()
+    close()
+    figure(figsize=(20,10))
+    model.plot_partial_effects_on_outcome(compare, value)
+    show()
+    close()
+
+def hyp_test(data, compare, alpha=None, duration="tenure", event="churn"):
+
+    """This function takes, following arguments: 
+    
+    1. df: DataFrame
+    2. comare: Name of the column to view the partial effects on outcome
+    3. alpha: The value of alpha (optional)
+    4. duration: Name of column to be set as duration as string (optional)
+    5. event: Name of column to be set as event as string (optional)
+    
+    Then prints weather the hypothesis based on a column can be rejected or not
+    after comparing it with the p-value of that column obtained from the best model."""
+
+    model = best_model(data, duration, event)
+    model.fit(data, duration_col=duration, event_col=event)
+    
+    if alpha == None:
+        alpha = model.alpha
+
+    p = model.summary["p"]["mu_"][compare]
+
+    if p < alpha:
+        print("Reject Null Hypothesis")
+    else:
+        print("Null Hypothesis can't be rejected")
+
+def hyp_test_segment(data, compare, alpha=None, duration="tenure", event="churn"):
+    
+    """This function takes, following arguments: 
+    
+    1. df: DataFrame
+    2. comare: Name of the column to view the partial effects on outcome
+    3. alpha: The value of alpha (optional)
+    4. duration: Name of column to be set as duration as string (optional)
+    5. event: Name of column to be set as event as string (optional)
+    
+    Then check all the unique values of columns having categorical data and prints
+    the name of columns and the values whose hypothesis can be rejected, if none
+    can be rejected	then the function says so."""
+    
+
+
+    model = best_model(data, duration, event)
+    
+    n = False
+    for i in data.columns:
+        if len(data[i].unique())<= 10 and i != "retire":
+            for j in data[i].unique():
+                try:
+                    temp = data[data[i] == j] 
+                    model.fit(temp, duration_col=duration, event_col=event)
+
+                    if alpha == None:
+                        alpha = model.alpha
+                    p = model.summary["p"]["mu_"][compare]
+
+                    if type(p) == 'numpy.float64':
+                        if p < alpha:
+                            n = True
+                            print("Reject Null Hypothesis for", i, j)
+                except:
+                    pass
+    if n == False:
+        print("Null Hypothesis not rejected for any segment")
+
+
