@@ -1,11 +1,22 @@
 # Marketing_Analytics
-The package is created to implement Thompson Sampling algorithm.
+The package is created to implement CLV analysis.
 
 # Features
-Implement Thompson Sampling with Beta Distribution.
+Make the data ready to use making it a categorical data.
 
-Implement Thompson Sampling with Normal Distribution.
+Find the best model based on the minimum AIC score out of 3 models: LogNormalAFTFitter, LogLogisticAFTFitter, CoxPHFitter.
 
-Do both static and dynamic visualizations for the distributions' pdf functions.
+Calculate the CLV.
+
+Visualize the CLV.
+
+Hypothesis testing.
 
 # Usage
+
+data = prepare_data("Book1.xlsx")
+data.head()
+best_model(data)
+calculate_CLV(data)
+visualize_CLV(data, 'gender')
+hyp_test(data, "gender")
