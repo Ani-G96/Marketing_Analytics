@@ -14,7 +14,7 @@ Hypothesis testing.
 
 # Usage
 
-data = prepare_data("Book1.xlsx")
+data = prepare_data("Sample_data.xlsx")
 
 data.head()
 
