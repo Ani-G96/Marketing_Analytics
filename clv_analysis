@@ -130,4 +130,4 @@ def hyp_test(data, compare, alpha=None, duration="tenure", event="churn"):
     if p < alpha:
         print("Reject Null Hypothesis")
     else:
-        print("Null Hypothesis failed to be rejected.")
+        print("Null Hypothesis failed to be rejected.") 
